@@ -1,0 +1,46 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+  namespace: appka-1
+spec:
+  mode: daemonset
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+    
+    processors:
+      batch:
+      filter:
+        error_mode: ignore
+        traces:
+          span:
+            - 'attributes["http.target"] == "/bootstrap/seed-nodes"'
+            - 'attributes["net.peer.port"] == "8558"'
+            - 'IsMatch(attributes["user_agent.original"], "kube-probe/.*")'
+            - 'IsMatch(attributes["http.url"], ".*/bootstrap/seed-nodes")'
+            - 'IsMatch(attributes["http.url"], ".*/pods?labelSelector.*")'
+
+    exporters:
+      logging:
+        loglevel: debug
+    
+      jaeger:
+        endpoint: jaeger-collector:14250
+        tls:
+         insecure: true
+    
+      otlp/honeycomb:
+        endpoint: api.honeycomb.io:443
+        headers: 
+          x-honeycomb-team: UvVWzXFvEmRGITRjZoX8nC
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [filter,batch]
+          #exporters: [jaeger,logging,otlp/honeycomb]
+          exporters: [jaeger,logging]
